@@ -1,9 +1,8 @@
 // Single place for the dev-only demo toggles requested by the PRP: a failure
-// injector (prove optimistic-update rollback), a render-error flag (prove the
-// ErrorBoundary catches render errors), a render counter (prove React.memo
-// holds), and a large-dataset toggle (prove VirtualList windows real rows).
-// All are read from the URL query string so they're toggleable without a
-// rebuild and never affect production behavior unless explicitly set.
+// injector, a render-error flag, a render counter, and a large-dataset
+// toggle — each proves behavior (rollback, ErrorBoundary, memo, windowing)
+// that's otherwise hard to trigger from the UI. All read the URL query
+// string, so they're toggleable without a rebuild and inert by default.
 
 function getParam(name: string): string | null {
   if (typeof window === "undefined") return null;

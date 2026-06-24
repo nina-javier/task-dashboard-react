@@ -1,7 +1,8 @@
 import { memo } from "react";
-import { Calendar, MoreHorizontal, User } from "lucide-react";
+import { Calendar, Pencil, User } from "lucide-react";
 import type { Task, TaskStatus } from "../types/task";
 import { isRenderCounterEnabled, isRenderErrorEnabled } from "../devFlags";
+import { useTaskActions } from "../context/TaskActionsContext";
 
 const STATUS_DOT: Record<TaskStatus, string> = {
   todo: "bg-gray-400",
@@ -46,6 +47,8 @@ interface TaskCardProps {
 const renderCounts = new Map<string, number>();
 
 function TaskCard({ task, onStatusChange }: TaskCardProps) {
+  const { openEdit } = useTaskActions();
+
   // Dev-only proof that ErrorBoundary catches render errors: ?throwRender=1
   // makes the first card throw during render instead of returning JSX.
   if (isRenderErrorEnabled() && task.id === "1") {
@@ -59,7 +62,12 @@ function TaskCard({ task, onStatusChange }: TaskCardProps) {
   }
 
   return (
-    <div className="task-card flex items-start justify-between gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    // max-h caps the card below TaskList's ROW_HEIGHT (140px) so it can
+    // never grow into the next absolutely-positioned virtualized row, no
+    // matter how long the description is; line-clamp on the description
+    // keeps that the common case rather than something overflow-hidden has
+    // to silently clip every time.
+    <div className="task-card flex max-h-[132px] items-start justify-between gap-4 overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span
@@ -68,7 +76,7 @@ function TaskCard({ task, onStatusChange }: TaskCardProps) {
           />
           <h3 className="truncate font-semibold text-gray-900">{task.title}</h3>
         </div>
-        <p className="mt-1 text-sm text-gray-500">{task.description}</p>
+        <p className="mt-1 line-clamp-2 text-sm text-gray-500">{task.description}</p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span
@@ -92,10 +100,11 @@ function TaskCard({ task, onStatusChange }: TaskCardProps) {
       <div className="flex flex-shrink-0 flex-col items-end gap-2">
         <button
           type="button"
-          aria-label={`More actions for ${task.title}`}
+          aria-label={`Edit ${task.title}`}
+          onClick={() => openEdit(task)}
           className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
         >
-          <MoreHorizontal size={18} />
+          <Pencil size={16} />
         </button>
         <span className="flex items-center gap-1.5 text-sm text-gray-500">
           <User size={14} aria-hidden="true" />

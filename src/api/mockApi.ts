@@ -1,8 +1,11 @@
-import type { Task } from "../types/task";
+import type { Task, TaskInput } from "../types/task";
 import { isLargeDatasetEnabled, isFailureInjectorEnabled } from "../devFlags";
 import mockData from "./data/mockData.json";
 
-const TASKS = mockData as Task[];
+// Mutable, seeded from the JSON fixture. create/update/delete mutate this
+// directly so changes persist for the session (e.g. survive a refetch) —
+// unlike `updateTaskStatus` below, which intentionally does not mutate it.
+let store: Task[] = structuredClone(mockData) as Task[];
 
 // Dev-only: ?syntheticTasks=1 swaps the 5-row mock for a static 1,000-row
 // dataset so VirtualList's windowing is actually exercised, not just trusted
@@ -18,7 +21,7 @@ async function loadLargeDataset(): Promise<Task[]> {
 }
 
 async function resolveTaskPool(): Promise<Task[]> {
-  return isLargeDatasetEnabled() ? loadLargeDataset() : TASKS;
+  return isLargeDatasetEnabled() ? loadLargeDataset() : store;
 }
 
 export function fetchTasks(signal?: AbortSignal): Promise<Task[]> {
@@ -59,4 +62,49 @@ export function updateTaskStatus(id: string, status: Task["status"]): Promise<Ta
         }, 300),
       ),
   );
+}
+
+function generateId(): string {
+  return `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// create/update/delete always operate on the default `store`, not the
+// large synthetic dataset — that fixture exists purely for the
+// virtualization demo and isn't meant to be edited.
+export function createTask(input: TaskInput): Promise<Task> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const task: Task = { ...input, id: generateId(), createdAt: new Date().toISOString() };
+      store = [task, ...store];
+      resolve(structuredClone(task));
+    }, 300);
+  });
+}
+
+export function updateTask(id: string, updates: Partial<TaskInput>): Promise<Task> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const existing = store.find((t) => t.id === id);
+      if (!existing) {
+        reject(new Error(`Task ${id} not found`));
+        return;
+      }
+      const updated: Task = { ...existing, ...updates };
+      store = store.map((t) => (t.id === id ? updated : t));
+      resolve(structuredClone(updated));
+    }, 300);
+  });
+}
+
+export function deleteTask(id: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (!store.some((t) => t.id === id)) {
+        reject(new Error(`Task ${id} not found`));
+        return;
+      }
+      store = store.filter((t) => t.id !== id);
+      resolve();
+    }, 300);
+  });
 }

@@ -11,6 +11,10 @@ export interface Task {
   createdAt: string;
 }
 
+// Fields a user supplies when creating or editing a task — everything
+// except the server-assigned id/createdAt.
+export type TaskInput = Omit<Task, "id" | "createdAt">;
+
 export interface Filters {
   status: TaskStatus[]; // multi-select; [] means "all"
   priority: TaskPriority[]; // multi-select; [] means "all"

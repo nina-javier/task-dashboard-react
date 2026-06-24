@@ -9,20 +9,11 @@ interface VirtualListProps<T> {
   getKey: (item: T, index: number) => string;
 }
 
-// Fixed-row-height windowing: only the rows inside the scrolled viewport
-// (plus a small overscan buffer) are mounted, so cost stays O(visible rows)
-// regardless of total list length.
-//
-// 10,000+ row strategy for VARIABLE-height rows (not implemented here,
-// since this dataset's cards are uniform height): fixed-height windowing
-// breaks because you can't compute an item's scroll offset from its index
-// alone. The standard fix is to keep a measured-height cache (e.g. a Map of
-// index -> last measured height, seeded with an estimate), derive a
-// cumulative offset array/prefix-sum from it to binary-search "which items
-// are in the current scroll range", and re-measure with a ResizeObserver as
-// rows mount, patching the cache and offset array incrementally. Libraries
-// like react-virtual/react-window implement exactly this; doing it by hand
-// is out of scope for a fixed-height list of mock tasks.
+// Fixed-row-height windowing: only rows in the scrolled viewport (+ overscan)
+// are mounted, so cost stays O(visible rows) regardless of list length.
+// 10,000+ VARIABLE-height rows would instead need a measured-height cache,
+// a binary-searched cumulative-offset array, and a ResizeObserver to patch
+// both as rows mount — out of scope here since these cards are uniform.
 export default function VirtualList<T>({
   items,
   rowHeight,
@@ -39,30 +30,45 @@ export default function VirtualList<T>({
   const endIndex = Math.min(items.length, startIndex + visibleCount + overscan * 2);
   const visibleItems = items.slice(startIndex, endIndex);
 
+  // Only shown when windowing is actually doing work (more items exist than
+  // fit on screen) — visible proof that the DOM node count stays bounded
+  // instead of growing with the dataset, without needing to open DevTools.
+  const isWindowing = items.length > visibleItems.length;
+
   return (
-    <div
-      ref={containerRef}
-      onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-      style={{ height, overflowY: "auto", position: "relative" }}
-    >
-      <div style={{ height: items.length * rowHeight, position: "relative" }}>
-        {visibleItems.map((item, i) => {
-          const index = startIndex + i;
-          return (
-            <div
-              key={getKey(item, index)}
-              style={{
-                position: "absolute",
-                top: index * rowHeight,
-                left: 0,
-                right: 0,
-                height: rowHeight,
-              }}
-            >
-              {renderItem(item, index)}
-            </div>
-          );
-        })}
+    <div>
+      {isWindowing && (
+        <div className="mb-2 flex justify-end">
+          <span className="rounded-md bg-gray-900/80 px-2 py-1 text-xs font-medium text-white">
+            Rendering {visibleItems.length} of {items.length} (virtualized)
+          </span>
+        </div>
+      )}
+      <div
+        ref={containerRef}
+        data-testid="virtual-list-viewport"
+        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        style={{ height, overflowY: "auto", position: "relative" }}
+      >
+        <div style={{ height: items.length * rowHeight, position: "relative" }}>
+          {visibleItems.map((item, i) => {
+            const index = startIndex + i;
+            return (
+              <div
+                key={getKey(item, index)}
+                style={{
+                  position: "absolute",
+                  top: index * rowHeight,
+                  left: 0,
+                  right: 0,
+                  height: rowHeight,
+                }}
+              >
+                {renderItem(item, index)}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

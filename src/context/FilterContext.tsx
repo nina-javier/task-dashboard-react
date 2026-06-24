@@ -1,5 +1,14 @@
-import { createContext, useCallback, useContext, useMemo, useReducer, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  type ReactNode,
+} from "react";
 import type { Filters, TaskPriority, TaskStatus } from "../types/task";
+import { readFiltersFromUrl, writeFiltersToUrl } from "../utils/urlState";
 
 type FilterAction =
   | { type: "TOGGLE_STATUS"; status: TaskStatus }
@@ -41,7 +50,15 @@ interface FilterContextValue {
 const FilterContext = createContext<FilterContextValue | null>(null);
 
 export function FilterProvider({ children }: { children: ReactNode }) {
-  const [filters, dispatch] = useReducer(filterReducer, initialFilters);
+  const [filters, dispatch] = useReducer(filterReducer, initialFilters, () =>
+    readFiltersFromUrl(),
+  );
+
+  // Keeps the URL shareable/bookmarkable and survives reloads; reads happen
+  // only once, lazily, in the reducer's initializer above.
+  useEffect(() => {
+    writeFiltersToUrl(filters);
+  }, [filters]);
 
   // Stable function identities are required: TaskFilters' debounce effect
   // depends on `setAssignee`, so a new identity on every render would

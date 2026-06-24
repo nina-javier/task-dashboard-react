@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchTasks, updateTaskStatus } from "../api/mockApi";
-import type { Task, TaskStatus, TasksState } from "../types/task";
+import {
+  createTask as apiCreateTask,
+  deleteTask as apiDeleteTask,
+  fetchTasks,
+  updateTask as apiUpdateTask,
+  updateTaskStatus,
+} from "../api/mockApi";
+import type { Task, TaskInput, TaskStatus, TasksState } from "../types/task";
 
 // Module-level cache so remounting the hook doesn't re-trigger the 800ms
 // fetch. `refetch` bypasses/refreshes it explicitly.
@@ -10,6 +16,9 @@ export interface UseTasksResult {
   state: TasksState;
   refetch: () => void;
   setStatus: (id: string, status: TaskStatus) => void;
+  createTask: (input: TaskInput) => Promise<Task>;
+  updateTask: (id: string, updates: Partial<TaskInput>) => Promise<Task>;
+  deleteTask: (id: string) => Promise<void>;
 }
 
 export function useTasks(): UseTasksResult {
@@ -101,5 +110,47 @@ export function useTasks(): UseTasksResult {
     });
   }, []);
 
-  return { state, refetch, setStatus };
+  // create/update/delete are awaited directly rather than applied
+  // optimistically: they're modal-driven (the UI already shows a pending
+  // state via a disabled Save/Delete button) and the mock never rejects
+  // them, unlike the always-visible inline status `<select>` above.
+  const createTask = useCallback(async (input: TaskInput) => {
+    const created = await apiCreateTask(input);
+    if (mountedRef.current) {
+      setState((current) => {
+        if (current.status !== "success") return current;
+        const next = [created, ...current.tasks];
+        cachedTasks = next;
+        return { status: "success", tasks: next, error: null };
+      });
+    }
+    return created;
+  }, []);
+
+  const updateTask = useCallback(async (id: string, updates: Partial<TaskInput>) => {
+    const updated = await apiUpdateTask(id, updates);
+    if (mountedRef.current) {
+      setState((current) => {
+        if (current.status !== "success") return current;
+        const next = current.tasks.map((t) => (t.id === id ? updated : t));
+        cachedTasks = next;
+        return { status: "success", tasks: next, error: null };
+      });
+    }
+    return updated;
+  }, []);
+
+  const deleteTask = useCallback(async (id: string) => {
+    await apiDeleteTask(id);
+    if (mountedRef.current) {
+      setState((current) => {
+        if (current.status !== "success") return current;
+        const next = current.tasks.filter((t) => t.id !== id);
+        cachedTasks = next;
+        return { status: "success", tasks: next, error: null };
+      });
+    }
+  }, []);
+
+  return { state, refetch, setStatus, createTask, updateTask, deleteTask };
 }

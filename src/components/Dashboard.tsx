@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import TaskFilters from "./TaskFilters";
 import TaskList from "./TaskList";
@@ -6,16 +6,17 @@ import ErrorBoundary from "./ErrorBoundary";
 import LoadingState from "./states/LoadingState";
 import EmptyState from "./states/EmptyState";
 import ErrorState from "./states/ErrorState";
-import { useTasks } from "../hooks/useTasks";
+import { useTaskData } from "../context/TaskActionsContext";
 import { useFilters } from "../context/FilterContext";
 import { filterTasks } from "../utils/filterTasks";
 import { sortTasks, type SortOrder } from "../utils/sortTasks";
+import { readSortFromUrl, writeSortToUrl } from "../utils/urlState";
 import type { Filters, Task, TaskStatus } from "../types/task";
 
 const TaskStats = lazy(() => import("./TaskStats"));
 
 export default function Dashboard() {
-  const { state, refetch, setStatus } = useTasks();
+  const { state, refetch, setStatus } = useTaskData();
   const { filters } = useFilters();
 
   if (state.status === "loading") {
@@ -42,7 +43,12 @@ interface DashboardContentProps {
 }
 
 function DashboardContent({ tasks, filters, onStatusChange }: DashboardContentProps) {
-  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  const [sortOrder, setSortOrder] = useState<SortOrder>(readSortFromUrl);
+
+  useEffect(() => {
+    writeSortToUrl(sortOrder);
+  }, [sortOrder]);
+
   const visibleTasks = useMemo(() => filterTasks(tasks, filters), [tasks, filters]);
   const sortedTasks = useMemo(
     () => sortTasks(visibleTasks, sortOrder),
